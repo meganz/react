@@ -343,10 +343,7 @@ export function shouldSetTextContent(type: string, props: Props): boolean {
     type === 'textarea' ||
     type === 'noscript' ||
     typeof props.children === 'string' ||
-    typeof props.children === 'number' ||
-    (typeof props.dangerouslySetInnerHTML === 'object' &&
-      props.dangerouslySetInnerHTML !== null &&
-      props.dangerouslySetInnerHTML.__html != null)
+    typeof props.children === 'number'
   );
 }
 
@@ -383,28 +380,12 @@ export const scheduleTimeout: any =
 export const cancelTimeout: any =
   typeof clearTimeout === 'function' ? clearTimeout : (undefined: any);
 export const noTimeout = -1;
-const localPromise = typeof Promise === 'function' ? Promise : undefined;
 
 // -------------------
 //     Microtasks
 // -------------------
 export const supportsMicrotasks = true;
-export const scheduleMicrotask: any =
-  typeof queueMicrotask === 'function'
-    ? queueMicrotask
-    : typeof localPromise !== 'undefined'
-    ? callback =>
-        localPromise
-          .resolve(null)
-          .then(callback)
-          .catch(handleErrorInNextTick)
-    : scheduleTimeout; // TODO: Determine the best fallback here.
-
-function handleErrorInNextTick(error) {
-  setTimeout(() => {
-    throw error;
-  });
-}
+export const scheduleMicrotask: any = queueMicrotask;
 
 // -------------------
 //     Mutation

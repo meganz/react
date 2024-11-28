@@ -40,12 +40,6 @@ type TextAreaWithWrapperState = HTMLTextAreaElement & {|
 export function getHostProps(element: Element, props: Object) {
   const node = ((element: any): TextAreaWithWrapperState);
 
-  if (props.dangerouslySetInnerHTML != null) {
-    throw new Error(
-      '`dangerouslySetInnerHTML` does not make sense on <textarea>.',
-    );
-  }
-
   // Always set children to the same thing. In IE9, the selection range will
   // get reset if `textContent` is mutated.  We could add a check in setTextContent
   // to only set the value if/when the value differs from the node value (which would

@@ -211,7 +211,7 @@ export function shouldRemoveAttribute(
 }
 
 export function getPropertyInfo(name: string): PropertyInfo | null {
-  return properties.hasOwnProperty(name) ? properties[name] : null;
+  return properties[name] || null;
 }
 
 function PropertyInfoRecord(
@@ -239,7 +239,7 @@ function PropertyInfoRecord(
 // When adding attributes to this list, be sure to also add them to
 // the `possibleStandardNames` module to ensure casing and incorrect
 // name warnings.
-const properties = {};
+const properties = Object.create(null);
 
 // These props are reserved by React. They shouldn't be written to the DOM.
 const reservedProps = [

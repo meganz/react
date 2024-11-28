@@ -1,0 +1,18 @@
+{
+  "bundleSizes": [
+    {
+      "filename": "react.js",
+      "bundleType": "UMD_DEV",
+      "packageName": "react",
+      "size": 26941,
+      "gzip": 6493
+    },
+    {
+      "filename": "react-dom.js",
+      "bundleType": "UMD_DEV",
+      "packageName": "react-dom",
+      "size": 418585,
+      "gzip": 75887
+    }
+  ]
+}
