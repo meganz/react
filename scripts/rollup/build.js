@@ -23,15 +23,6 @@ const {asyncRimRaf} = require('./utils');
 const codeFrame = require('babel-code-frame');
 const Wrappers = require('./wrappers');
 
-const RELEASE_CHANNEL = process.env.RELEASE_CHANNEL;
-
-// Default to building in experimental mode. If the release channel is set via
-// an environment variable, then check if it's "experimental".
-const __EXPERIMENTAL__ =
-  typeof RELEASE_CHANNEL === 'string'
-    ? RELEASE_CHANNEL === 'experimental'
-    : true;
-
 // Errors in promises should be fatal.
 let loggedErrors = new Set();
 process.on('unhandledRejection', err => {
@@ -43,23 +34,7 @@ process.on('unhandledRejection', err => {
 });
 
 const {
-  NODE_ES2015,
-  NODE_ESM,
-  UMD_DEV,
-  UMD_PROD,
-  UMD_PROFILING,
-  NODE_DEV,
-  NODE_PROD,
-  NODE_PROFILING,
-  FB_WWW_DEV,
-  FB_WWW_PROD,
-  FB_WWW_PROFILING,
-  RN_OSS_DEV,
-  RN_OSS_PROD,
-  RN_OSS_PROFILING,
-  RN_FB_DEV,
-  RN_FB_PROD,
-  RN_FB_PROFILING,
+  UMD_DEV
 } = Bundles.bundleTypes;
 
 const {getFilename} = Bundles;
@@ -90,13 +65,11 @@ const requestedBundleTypes = argv.type
 const requestedBundleNames = parseRequestedNames(argv._, 'lowercase');
 const forcePrettyOutput = argv.pretty;
 const isWatchMode = argv.watch;
-const syncFBSourcePath = argv['sync-fbsource'];
-const syncWWWPath = argv['sync-www'];
 
 const closureOptions = {
   compilation_level: 'SIMPLE',
-  language_in: 'ECMASCRIPT_2015',
-  language_out: 'ECMASCRIPT5_STRICT',
+  language_in: 'ECMASCRIPT_2018',
+  language_out: 'ECMASCRIPT_2018',
   env: 'CUSTOM',
   warning_level: 'QUIET',
   apply_input_source_maps: false,
@@ -110,34 +83,7 @@ const closureOptions = {
 const babelPlugins = [
   // These plugins filter out non-ES2015.
   '@babel/plugin-transform-flow-strip-types',
-  ['@babel/plugin-proposal-class-properties', {loose: true}],
   'syntax-trailing-function-commas',
-  // These use loose mode which avoids embedding a runtime.
-  // TODO: Remove object spread from the source. Prefer Object.assign instead.
-  [
-    '@babel/plugin-proposal-object-rest-spread',
-    {loose: true, useBuiltIns: true},
-  ],
-  ['@babel/plugin-transform-template-literals', {loose: true}],
-  // TODO: Remove for...of from the source. It requires a runtime to be embedded.
-  '@babel/plugin-transform-for-of',
-  // TODO: Remove array spread from the source. Prefer .apply instead.
-  ['@babel/plugin-transform-spread', {loose: true, useBuiltIns: true}],
-  '@babel/plugin-transform-parameters',
-  // TODO: Remove array destructuring from the source. Requires runtime.
-  ['@babel/plugin-transform-destructuring', {loose: true, useBuiltIns: true}],
-  // Transform Object spread to shared/assign
-  require('../babel/transform-object-assign'),
-];
-
-const babelToES5Plugins = [
-  // These plugins transform DEV mode. Closure compiler deals with these in PROD.
-  '@babel/plugin-transform-literals',
-  '@babel/plugin-transform-arrow-functions',
-  '@babel/plugin-transform-block-scoped-functions',
-  '@babel/plugin-transform-shorthand-properties',
-  '@babel/plugin-transform-computed-properties',
-  ['@babel/plugin-transform-block-scoping', {throwIfClosureRequired: true}],
 ];
 
 function getBabelConfig(
@@ -159,7 +105,6 @@ function getBabelConfig(
   };
   if (isDevelopment) {
     options.plugins.push(
-      ...babelToES5Plugins,
       // Turn console.error/warn() into a custom wrapper
       [
         require('../babel/transform-replace-console-calls'),
@@ -172,11 +117,6 @@ function getBabelConfig(
   if (updateBabelOptions) {
     options = updateBabelOptions(options);
   }
-  // Controls whether to replace error messages with error codes in production.
-  // By default, error messages are replaced in production.
-  if (!isDevelopment && bundle.minifyWithProdErrorCodes !== false) {
-    options.plugins.push(require('../error-codes/transform-error-messages'));
-  }
 
   return options;
 }
@@ -188,94 +128,30 @@ function getRollupOutputOptions(
   globalName,
   bundleType
 ) {
-  const isProduction = isProductionBundleType(bundleType);
-
   return {
     file: outputPath,
     format,
     globals,
-    freeze: !isProduction,
-    interop: false,
+    compact: true,
+    validate: true,
+    interop: 'compat',
     name: globalName,
     sourcemap: false,
     esModule: false,
+    generatedCode: {
+      symbols: false,
+      preset: 'es2015',
+      constBindings: true,
+      arrowFunctions: true,
+      objectShorthand: true
+    }
   };
 }
 
 function getFormat(bundleType) {
   switch (bundleType) {
     case UMD_DEV:
-    case UMD_PROD:
-    case UMD_PROFILING:
       return `umd`;
-    case NODE_ES2015:
-    case NODE_DEV:
-    case NODE_PROD:
-    case NODE_PROFILING:
-    case FB_WWW_DEV:
-    case FB_WWW_PROD:
-    case FB_WWW_PROFILING:
-    case RN_OSS_DEV:
-    case RN_OSS_PROD:
-    case RN_OSS_PROFILING:
-    case RN_FB_DEV:
-    case RN_FB_PROD:
-    case RN_FB_PROFILING:
-      return `cjs`;
-    case NODE_ESM:
-      return `es`;
-  }
-}
-
-function isProductionBundleType(bundleType) {
-  switch (bundleType) {
-    case NODE_ES2015:
-    case NODE_ESM:
-    case UMD_DEV:
-    case NODE_DEV:
-    case FB_WWW_DEV:
-    case RN_OSS_DEV:
-    case RN_FB_DEV:
-      return false;
-    case UMD_PROD:
-    case NODE_PROD:
-    case UMD_PROFILING:
-    case NODE_PROFILING:
-    case FB_WWW_PROD:
-    case FB_WWW_PROFILING:
-    case RN_OSS_PROD:
-    case RN_OSS_PROFILING:
-    case RN_FB_PROD:
-    case RN_FB_PROFILING:
-      return true;
-    default:
-      throw new Error(`Unknown type: ${bundleType}`);
-  }
-}
-
-function isProfilingBundleType(bundleType) {
-  switch (bundleType) {
-    case NODE_ES2015:
-    case NODE_ESM:
-    case FB_WWW_DEV:
-    case FB_WWW_PROD:
-    case NODE_DEV:
-    case NODE_PROD:
-    case RN_FB_DEV:
-    case RN_FB_PROD:
-    case RN_OSS_DEV:
-    case RN_OSS_PROD:
-    case UMD_DEV:
-    case UMD_PROD:
-      return false;
-    case FB_WWW_PROFILING:
-    case NODE_PROFILING:
-    case RN_FB_PROFILING:
-    case RN_OSS_PROFILING:
-    case UMD_PROFILING:
-      return true;
-    default:
-      throw new Error(`Unknown type: ${bundleType}`);
   }
 }
 
@@ -306,24 +182,8 @@ function getPlugins(
   bundle
 ) {
   const forks = Modules.getForks(bundleType, entry, moduleType, bundle);
-  const isProduction = isProductionBundleType(bundleType);
-  const isProfiling = isProfilingBundleType(bundleType);
-  const isUMDBundle =
-    bundleType === UMD_DEV ||
-    bundleType === UMD_PROD ||
-    bundleType === UMD_PROFILING;
-  const isFBWWWBundle =
-    bundleType === FB_WWW_DEV ||
-    bundleType === FB_WWW_PROD ||
-    bundleType === FB_WWW_PROFILING;
-  const isRNBundle =
-    bundleType === RN_OSS_DEV ||
-    bundleType === RN_OSS_PROD ||
-    bundleType === RN_OSS_PROFILING ||
-    bundleType === RN_FB_DEV ||
-    bundleType === RN_FB_PROD ||
-    bundleType === RN_FB_PROFILING;
-  const shouldStayReadable = isFBWWWBundle || isRNBundle || forcePrettyOutput;
+  const isUMDBundle = true;
+  const shouldStayReadable = true;
   return [
     // Shim any modules that need forking in this environment.
     useForks(forks),
@@ -344,7 +204,7 @@ function getPlugins(
         bundleType,
         packageName,
         externals,
-        !isProduction,
+        true,
         bundle
       )
     ),
@@ -356,21 +216,15 @@ function getPlugins(
     },
     // Turn __DEV__ and process.env checks into constants.
     replace({
-      __DEV__: isProduction ? 'false' : 'true',
-      __PROFILE__: isProfiling || !isProduction ? 'true' : 'false',
-      __UMD__: isUMDBundle ? 'true' : 'false',
-      'process.env.NODE_ENV': isProduction ? "'production'" : "'development'",
-      __EXPERIMENTAL__,
+      __DEV__: 'false',
+      __PROFILE__: 'false',
+      __UMD__: 'true',
+      __EXPERIMENTAL__: false,
       // Enable forked reconciler.
       // NOTE: I did not put much thought into how to configure this.
       __VARIANT__: bundle.enableNewReconciler === true,
     }),
-    // The CommonJS plugin *only* exists to pull "art" into "react-art".
-    // I'm going to port "art" to ES modules to avoid this problem.
-    // Please don't enable this for anything else!
-    isUMDBundle && entry === 'react-art' && commonjs(),
     // Apply dead code elimination and/or minification.
-    isProduction &&
       closure(
         Object.assign({}, closureOptions, {
           // Don't let it create global variables in the browser.
@@ -381,7 +235,7 @@ function getPlugins(
       ),
     // HACK to work around the fact that Rollup isn't removing unused, pure-module imports.
     // Note that this plugin must be called after closure applies DCE.
-    isProduction && stripUnusedImports(pureExternalModules),
+    stripUnusedImports(pureExternalModules),
     // Add the whitespace back if necessary.
     shouldStayReadable &&
       prettier({
@@ -461,40 +315,6 @@ function shouldSkipBundle(bundle, bundleType) {
   return false;
 }
 
-function resolveEntryFork(resolvedEntry, isFBBundle) {
-  // Pick which entry point fork to use:
-  // .modern.fb.js
-  // .classic.fb.js
-  // .fb.js
-  // .stable.js
-  // .experimental.js
-  // .js
-
-  if (isFBBundle) {
-    const resolvedFBEntry = resolvedEntry.replace(
-      '.js',
-      __EXPERIMENTAL__ ? '.modern.fb.js' : '.classic.fb.js'
-    );
-    if (fs.existsSync(resolvedFBEntry)) {
-      return resolvedFBEntry;
-    }
-    const resolvedGenericFBEntry = resolvedEntry.replace('.js', '.fb.js');
-    if (fs.existsSync(resolvedGenericFBEntry)) {
-      return resolvedGenericFBEntry;
-    }
-    // Even if it's a FB bundle we fallthrough to pick stable or experimental if we don't have an FB fork.
-  }
-  const resolvedForkedEntry = resolvedEntry.replace(
-    '.js',
-    __EXPERIMENTAL__ ? '.experimental.js' : '.stable.js'
-  );
-  if (fs.existsSync(resolvedForkedEntry)) {
-    return resolvedForkedEntry;
-  }
-  // Just use the plain .js one.
-  return resolvedEntry;
-}
-
 async function createBundle(bundle, bundleType) {
   if (shouldSkipBundle(bundle, bundleType)) {
     return;
@@ -506,25 +326,9 @@ async function createBundle(bundle, bundleType) {
   const format = getFormat(bundleType);
   const packageName = Packaging.getPackageName(bundle.entry);
 
-  const isFBWWWBundle =
-    bundleType === FB_WWW_DEV ||
-    bundleType === FB_WWW_PROD ||
-    bundleType === FB_WWW_PROFILING;
+  let resolvedEntry = require.resolve(bundle.entry);
 
-  const isFBRNBundle =
-    bundleType === RN_FB_DEV ||
-    bundleType === RN_FB_PROD ||
-    bundleType === RN_FB_PROFILING;
-
-  let resolvedEntry = resolveEntryFork(
-    require.resolve(bundle.entry),
-    isFBWWWBundle || isFBRNBundle
-  );
-
-  const shouldBundleDependencies =
-    bundleType === UMD_DEV ||
-    bundleType === UMD_PROD ||
-    bundleType === UMD_PROFILING;
+  const shouldBundleDependencies = true;
   const peerGlobals = Modules.getPeerGlobals(bundle.externals, bundleType);
   let externals = Object.keys(peerGlobals);
   if (!shouldBundleDependencies) {
@@ -708,23 +512,7 @@ async function buildEverything() {
   // eslint-disable-next-line no-for-of-loops/no-for-of-loops
   for (const bundle of Bundles.bundles) {
     bundles.push(
-      [bundle, NODE_ES2015],
-      [bundle, NODE_ESM],
-      [bundle, UMD_DEV],
-      [bundle, UMD_PROD],
-      [bundle, UMD_PROFILING],
-      [bundle, NODE_DEV],
-      [bundle, NODE_PROD],
-      [bundle, NODE_PROFILING],
-      [bundle, FB_WWW_DEV],
-      [bundle, FB_WWW_PROD],
-      [bundle, FB_WWW_PROFILING],
-      [bundle, RN_OSS_DEV],
-      [bundle, RN_OSS_PROD],
-      [bundle, RN_OSS_PROFILING],
-      [bundle, RN_FB_DEV],
-      [bundle, RN_FB_PROD],
-      [bundle, RN_FB_PROFILING]
+      [bundle, UMD_DEV]
     );
   }
 
@@ -738,15 +526,6 @@ async function buildEverything() {
   // eslint-disable-next-line no-for-of-loops/no-for-of-loops
   for (const [bundle, bundleType] of bundles) {
     await createBundle(bundle, bundleType);
-  }
-
-  await Packaging.copyAllShims();
-  await Packaging.prepareNpmPackages();
-
-  if (syncFBSourcePath) {
-    await Sync.syncReactNative(syncFBSourcePath);
-  } else if (syncWWWPath) {
-    await Sync.syncReactDom('build/facebook-www', syncWWWPath);
   }
 
   console.log(Stats.printResults());

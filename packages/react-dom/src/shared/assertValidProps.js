@@ -7,38 +7,22 @@
 
 import voidElementTags from './voidElementTags';
 
-const HTML = '__html';
-
 function assertValidProps(tag: string, props: ?Object) {
   if (!props) {
     return;
   }
   // Note the use of `==` which checks for null or undefined.
   if (voidElementTags[tag]) {
-    if (props.children != null || props.dangerouslySetInnerHTML != null) {
+    if (props.children != null) {
+      // eslint-disable-next-line react-internal/prod-error-codes
       throw new Error(
-        `${tag} is a void element tag and must neither have \`children\` nor ` +
-          'use `dangerouslySetInnerHTML`.',
+        `${tag} is a void element tag and must not have 'children'`,
       );
     }
   }
   if (props.dangerouslySetInnerHTML != null) {
-    if (props.children != null) {
-      throw new Error(
-        'Can only set one of `children` or `props.dangerouslySetInnerHTML`.',
-      );
-    }
-
-    if (
-      typeof props.dangerouslySetInnerHTML !== 'object' ||
-      !(HTML in props.dangerouslySetInnerHTML)
-    ) {
-      throw new Error(
-        '`props.dangerouslySetInnerHTML` must be in the form `{__html: ...}`. ' +
-          'Please visit https://reactjs.org/link/dangerously-set-inner-html ' +
-          'for more information.',
-      );
-    }
+    // eslint-disable-next-line react-internal/prod-error-codes
+    throw new Error('`props.dangerouslySetInnerHTML` ... really ?');
   }
   if (__DEV__) {
     if (

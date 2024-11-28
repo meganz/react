@@ -127,14 +127,7 @@ function getTargetInstForChangeEvent(domEventName: DOMEventName, targetInst) {
 /**
  * SECTION: handle `input` event
  */
-let isInputEventSupported = false;
-if (canUseDOM) {
-  // IE9 claims to support the input event but fails to trigger it when
-  // deleting text, so we ignore its input events.
-  isInputEventSupported =
-    isEventSupported('input') &&
-    (!document.documentMode || document.documentMode > 9);
-}
+const isInputEventSupported = true;
 
 /**
  * (For IE <=9) Starts tracking propertychange events on the passed-in element
