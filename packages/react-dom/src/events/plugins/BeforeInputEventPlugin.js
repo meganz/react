@@ -30,12 +30,9 @@ import {accumulateTwoPhaseListeners} from '../DOMPluginEventSystem';
 const END_KEYCODES = [9, 13, 27, 32]; // Tab, Return, Esc, Space
 const START_KEYCODE = 229;
 
-const canUseCompositionEvent = canUseDOM && 'CompositionEvent' in window;
+const canUseCompositionEvent = true;
 
-let documentMode = null;
-if (canUseDOM && 'documentMode' in document) {
-  documentMode = document.documentMode;
-}
+const documentMode = null;
 
 // Webkit offers a very useful `textInput` event that can be used to
 // directly represent `beforeInput`. The IE `textinput` event is not as

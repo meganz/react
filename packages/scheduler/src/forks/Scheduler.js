@@ -41,18 +41,7 @@ import {
   startLoggingProfilingEvents,
 } from '../SchedulerProfiling';
 
-let getCurrentTime;
-const hasPerformanceNow =
-  typeof performance === 'object' && typeof performance.now === 'function';
-
-if (hasPerformanceNow) {
-  const localPerformance = performance;
-  getCurrentTime = () => localPerformance.now();
-} else {
-  const localDate = Date;
-  const initialTime = localDate.now();
-  getCurrentTime = () => localDate.now() - initialTime;
-}
+const getCurrentTime = () => performance.now();
 
 // Max 31 bit integer. The max integer size in V8 for 32-bit systems.
 // Math.pow(2, 30) - 1
@@ -87,19 +76,7 @@ var isPerformingWork = false;
 var isHostCallbackScheduled = false;
 var isHostTimeoutScheduled = false;
 
-// Capture local references to native APIs, in case a polyfill overrides them.
-const localSetTimeout = typeof setTimeout === 'function' ? setTimeout : null;
-const localClearTimeout =
-  typeof clearTimeout === 'function' ? clearTimeout : null;
-const localSetImmediate =
-  typeof setImmediate !== 'undefined' ? setImmediate : null; // IE and Node.js + jsdom
-
-const isInputPending =
-  typeof navigator !== 'undefined' &&
-  navigator.scheduling !== undefined &&
-  navigator.scheduling.isInputPending !== undefined
-    ? navigator.scheduling.isInputPending.bind(navigator.scheduling)
-    : null;
+const isInputPending = null;
 
 const continuousOptions = {includeContinuous: enableIsInputPendingContinuous};
 
@@ -547,36 +524,8 @@ const performWorkUntilDeadline = () => {
   needsPaint = false;
 };
 
-let schedulePerformWorkUntilDeadline;
-if (typeof localSetImmediate === 'function') {
-  // Node.js and old IE.
-  // There's a few reasons for why we prefer setImmediate.
-  //
-  // Unlike MessageChannel, it doesn't prevent a Node.js process from exiting.
-  // (Even though this is a DOM fork of the Scheduler, you could get here
-  // with a mix of Node.js 15+, which has a MessageChannel, and jsdom.)
-  // https://github.com/facebook/react/issues/20756
-  //
-  // But also, it runs earlier which is the semantic we want.
-  // If other browsers ever implement it, it's better to use it.
-  // Although both of these would be inferior to native scheduling.
-  schedulePerformWorkUntilDeadline = () => {
-    localSetImmediate(performWorkUntilDeadline);
-  };
-} else if (typeof MessageChannel !== 'undefined') {
-  // DOM and Worker environments.
-  // We prefer MessageChannel because of the 4ms setTimeout clamping.
-  const channel = new MessageChannel();
-  const port = channel.port2;
-  channel.port1.onmessage = performWorkUntilDeadline;
-  schedulePerformWorkUntilDeadline = () => {
-    port.postMessage(null);
-  };
-} else {
-  // We should only fallback here in non-browser environments.
-  schedulePerformWorkUntilDeadline = () => {
-    localSetTimeout(performWorkUntilDeadline, 0);
-  };
+function schedulePerformWorkUntilDeadline() {
+  queueMicrotask(performWorkUntilDeadline);
 }
 
 function requestHostCallback(callback) {
@@ -588,13 +537,13 @@ function requestHostCallback(callback) {
 }
 
 function requestHostTimeout(callback, ms) {
-  taskTimeoutID = localSetTimeout(() => {
+  taskTimeoutID = setTimeout(() => {
     callback(getCurrentTime());
   }, ms);
 }
 
 function cancelHostTimeout() {
-  localClearTimeout(taskTimeoutID);
+  clearTimeout(taskTimeoutID);
   taskTimeoutID = -1;
 }
 

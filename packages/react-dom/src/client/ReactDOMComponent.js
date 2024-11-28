@@ -48,7 +48,6 @@ import {
   restoreControlledState as ReactDOMTextareaRestoreControlledState,
 } from './ReactDOMTextarea';
 import {track} from './inputValueTracking';
-import setInnerHTML from './setInnerHTML';
 import setTextContent from './setTextContent';
 import {
   createDangerousStringForStyles,
@@ -82,13 +81,11 @@ import {
 let didWarnInvalidHydration = false;
 let didWarnScriptTags = false;
 
-const DANGEROUSLY_SET_INNER_HTML = 'dangerouslySetInnerHTML';
 const SUPPRESS_CONTENT_EDITABLE_WARNING = 'suppressContentEditableWarning';
 const SUPPRESS_HYDRATION_WARNING = 'suppressHydrationWarning';
 const AUTOFOCUS = 'autoFocus';
 const CHILDREN = 'children';
 const STYLE = 'style';
-const HTML = '__html';
 
 let warnedUnknownTags;
 
@@ -302,11 +299,6 @@ function setInitialDOMProperties(
       }
       // Relies on `updateStylesByID` not mutating `styleUpdates`.
       setValueForStyles(domElement, nextProp);
-    } else if (propKey === DANGEROUSLY_SET_INNER_HTML) {
-      const nextHtml = nextProp ? nextProp[HTML] : undefined;
-      if (nextHtml != null) {
-        setInnerHTML(domElement, nextHtml);
-      }
     } else if (propKey === CHILDREN) {
       if (typeof nextProp === 'string') {
         // Avoid setting initial textContent when the text is empty. In IE11 setting
@@ -357,8 +349,6 @@ function updateDOMProperties(
     const propValue = updatePayload[i + 1];
     if (propKey === STYLE) {
       setValueForStyles(domElement, propValue);
-    } else if (propKey === DANGEROUSLY_SET_INNER_HTML) {
-      setInnerHTML(domElement, propValue);
     } else if (propKey === CHILDREN) {
       setTextContent(domElement, propValue);
     } else {
@@ -401,24 +391,7 @@ export function createElement(
     }
 
     if (type === 'script') {
-      // Create the script via .innerHTML so its "parser-inserted" flag is
-      // set to true and it does not execute
-      const div = ownerDocument.createElement('div');
-      if (__DEV__) {
-        if (enableTrustedTypesIntegration && !didWarnScriptTags) {
-          console.error(
-            'Encountered a script tag while rendering React component. ' +
-              'Scripts inside React components are never executed when rendering ' +
-              'on the client. Consider using template tag instead ' +
-              '(https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template).',
-          );
-          didWarnScriptTags = true;
-        }
-      }
-      div.innerHTML = '<script><' + '/script>'; // eslint-disable-line
-      // This is guaranteed to yield a script element.
-      const firstChild = ((div.firstChild: any): HTMLScriptElement);
-      domElement = div.removeChild(firstChild);
+      throw new Error(type);
     } else if (typeof props.is === 'string') {
       // $FlowIssue `createElement` should be updated for Web Components
       domElement = ownerDocument.createElement(type, {is: props.is});
@@ -675,7 +648,7 @@ export function diffProperties(
           styleUpdates[styleName] = '';
         }
       }
-    } else if (propKey === DANGEROUSLY_SET_INNER_HTML || propKey === CHILDREN) {
+    } else if (propKey === CHILDREN) {
       // Noop. This is handled by the clear text mechanism.
     } else if (
       propKey === SUPPRESS_CONTENT_EDITABLE_WARNING ||
@@ -749,17 +722,6 @@ export function diffProperties(
           updatePayload.push(propKey, styleUpdates);
         }
         styleUpdates = nextProp;
-      }
-    } else if (propKey === DANGEROUSLY_SET_INNER_HTML) {
-      const nextHtml = nextProp ? nextProp[HTML] : undefined;
-      const lastHtml = lastProp ? lastProp[HTML] : undefined;
-      if (nextHtml != null) {
-        if (lastHtml !== nextHtml) {
-          (updatePayload = updatePayload || []).push(propKey, nextHtml);
-        }
-      } else {
-        // TODO: It might be too late to clear this if we have children
-        // inserted already.
       }
     } else if (propKey === CHILDREN) {
       if (typeof nextProp === 'string' || typeof nextProp === 'number') {
@@ -1038,15 +1000,6 @@ export function diffHydratedProperties(
         propKey === 'selected'
       ) {
         // Noop
-      } else if (propKey === DANGEROUSLY_SET_INNER_HTML) {
-        const serverHTML = domElement.innerHTML;
-        const nextHtml = nextProp ? nextProp[HTML] : undefined;
-        if (nextHtml != null) {
-          const expectedHTML = normalizeHTML(domElement, nextHtml);
-          if (expectedHTML !== serverHTML) {
-            warnForPropDifference(propKey, serverHTML, expectedHTML);
-          }
-        }
       } else if (propKey === STYLE) {
         // $FlowFixMe - Should be inferred as not undefined.
         extraAttributeNames.delete(propKey);

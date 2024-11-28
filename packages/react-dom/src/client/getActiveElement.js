@@ -8,10 +8,7 @@
  */
 
 export default function getActiveElement(doc: ?Document): ?Element {
-  doc = doc || (typeof document !== 'undefined' ? document : undefined);
-  if (typeof doc === 'undefined') {
-    return null;
-  }
+  doc = doc || document;
   try {
     return doc.activeElement || doc.body;
   } catch (e) {

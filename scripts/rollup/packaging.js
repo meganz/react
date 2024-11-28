@@ -55,7 +55,7 @@ function getBundleOutputPath(bundleType, filename, packageName) {
     case UMD_DEV:
     case UMD_PROD:
     case UMD_PROFILING:
-      return `build/node_modules/${packageName}/umd/${filename}`;
+      return `build/${filename}`;
     case FB_WWW_DEV:
     case FB_WWW_PROD:
     case FB_WWW_PROFILING:

@@ -420,19 +420,7 @@ function createReactNoop(reconciler: Function, useMutation: boolean) {
     noTimeout: -1,
 
     supportsMicrotasks: true,
-    scheduleMicrotask:
-      typeof queueMicrotask === 'function'
-        ? queueMicrotask
-        : typeof Promise !== 'undefined'
-        ? callback =>
-            Promise.resolve(null)
-              .then(callback)
-              .catch(error => {
-                setTimeout(() => {
-                  throw error;
-                });
-              })
-        : setTimeout,
+    scheduleMicrotask: queueMicrotask,
 
     prepareForCommit(): null | Object {
       return null;
